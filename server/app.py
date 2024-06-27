@@ -18,6 +18,25 @@ db.init_app(app)
 
 api = Api(app)
 
+# Define a function to run before each request
+@app.before_request 
+def check_if_logged_in():
+    
+    # Define a list of endpoints to run before each request
+    open_access_list = [
+        'clear', 
+        'article_list',
+        'show_article',
+        'login',
+        'logout',
+        'check_session',
+    ]
+
+    # Check if the requested endpoint is not in the open access list and the user is not logged in
+    # Return a 401 Unauthorized error
+    if (request.endpoint) not in open_access_list and (not session.get('user_id')):
+        return {'error': '401 Unauthorized'}, 401
+    
 class ClearSession(Resource):
 
     def delete(self):
@@ -47,8 +66,10 @@ class ShowArticle(Resource):
             if session['page_views'] <= 3:
                 return article_json, 200
 
-            return {'message': 'Maximum pageview limit reached'}, 401
-
+            # Return an error message if page view limit is exceeded
+            return make_response (
+                jsonify({'message': 'Maximum pageview limit reached'}), 401
+            )
         return article_json, 200
 
 class Login(Resource):
@@ -84,16 +105,25 @@ class CheckSession(Resource):
         
         return {}, 401
 
+# Define a resource for listing member-only articles
 class MemberOnlyIndex(Resource):
     
     def get(self):
-        pass
-
+        # Query all member-only articles
+        articles = Article.query.filter(Article.is_member_only == True).all() 
+        # Return the list of member-only articles as JSON
+        return [article.to_dict() for article in articles], 200 
+    
+# Define a resource for showing a single member-only article    
 class MemberOnlyArticle(Resource):
     
     def get(self, id):
-        pass
+        # Query the member-only article
+        article = Article.query.filter(Article.id == id).first()
+        # Return the article data as JSON
+        return article.to_dict(), 200
 
+# Add resources to the API with their respective endpoints
 api.add_resource(ClearSession, '/clear', endpoint='clear')
 api.add_resource(IndexArticle, '/articles', endpoint='article_list')
 api.add_resource(ShowArticle, '/articles/<int:id>', endpoint='show_article')
